@@ -176,10 +176,8 @@ class beat_viz():
                 self.current_mouse_position[0] -= jump 
             
             # Update the mouse position according to the jump
-            # self.move_mouse(jump)
+            self.move_mouse(jump)
 
-            # Move the single autonomous cursor
-            self.move_virtual_cursor()
         
         # Splash effect for the drop
         # self.drop_splash()
