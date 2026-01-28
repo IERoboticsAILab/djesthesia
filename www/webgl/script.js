@@ -1225,15 +1225,7 @@ function applyInputs () {
     if (virtualCursor && virtualCursor.is_active) {
         const texcoordX = virtualCursor.x / canvas.width;
         const texcoordY = 1.0 - virtualCursor.y / canvas.height;
-        
-        // Check if splash is triggered (big beat drop)
-        if (virtualCursor.splash) {
-            multipleSplats(parseInt(Math.random() * 20) + 5);
-        } else {
-            // Normal splat at virtual cursor position
-            const color = generateColor();
-            splat(texcoordX, texcoordY, 0, 0, color);
-        }
+        splat(texcoordX, texcoordY, 0, 0, color);
     }
 
     pointers.forEach(p => {
