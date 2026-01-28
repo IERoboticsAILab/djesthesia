@@ -38,6 +38,10 @@ var umh3_w = 0
 
 var changing_splat_radius = 0.25
 
+// Virtual Cursor
+let virtualCursor = null;
+let lastVirtualCursorFetch = 0;
+
 let config = {
     SIM_RESOLUTION: 64,
     DYE_RESOLUTION: 1024,
@@ -1155,6 +1159,22 @@ let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;
 update();
 
+// Add this function before update()
+function fetchVirtualCursor(){
+    fetch('http://127.0.0.1:8005/cursor')
+        .then(response => response.json())
+        .then(cursor => {
+            virtualCursor = cursor;
+            lastVirtualCursorFetch = Date.now();
+        })
+        .catch(err => {
+            // Server not responding - silent fail
+        });
+}
+
+// Start fetching virtual cursor data
+setInterval(fetchVirtualCursor, 16);
+
 function update () {
     const dt = calcDeltaTime();
     if (resizeCanvas())
@@ -1201,6 +1221,20 @@ function updateColors (dt) {
 function applyInputs () {
     if (splatStack.length > 0)
         multipleSplats(splatStack.pop());
+
+    if (virtualCursor && virtualCursor.is_active) {
+        const texcoordX = virtualCursor.x / canvas.width;
+        const texcoordY = 1.0 - virtualCursor.y / canvas.height;
+        
+        // Check if splash is triggered (big beat drop)
+        if (virtualCursor.splash) {
+            multipleSplats(parseInt(Math.random() * 20) + 5);
+        } else {
+            // Normal splat at virtual cursor position
+            const color = generateColor();
+            splat(texcoordX, texcoordY, 0, 0, color);
+        }
+    }
 
     pointers.forEach(p => {
         if (p.moved) {

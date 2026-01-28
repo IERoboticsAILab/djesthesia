@@ -7,30 +7,57 @@ import math
 import argparse
 from astar import astar
 import numpy as np
+import http.server
+import json
 
-# Position variables 
+# Motive Position variables
 x = 0
 y = 0
 z = 0
 
 color = None
 
+virtual_cursor = {
+    'x': 0,
+    'y': 650,
+    'is_active': True,
+    'mode': 'autonomous',
+    'splash': False
+}
+
+class VirtualCursorHTTPHandler(http.server.BaseHTTPRequestHandler):
+    """HTTP handler to serve virtual cursor position to WebGL"""
+    def do_GET(self):
+        if self.path == '/cursor':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps(virtual_cursor).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+    
+    def log_message(self, format, *args):
+        # Suppress logging
+        pass
+
 class ThreadedUDPRequestHandler(socketserver.BaseRequestHandler):
     def handle(self):
         data = self.request[0].strip()
         socket = self.request[1]
-        current_thread = threading.current_thread()
+        # current_thread = threading.current_thread()
         #print("{}: client: {}, wrote: {}".format(current_thread.name, self.client_address, data))
 
         data_string = list(data.decode()[1:-1].split(','))
-        data_int = [int(round(float(i),1)*10) for i in data_string]
+        data_int = [int(round(float(i), 1)*10) for i in data_string]
 
-        corrected_x = data_int[0] + 225 
+        corrected_x = data_int[0] + 225
         corrected_y = -data_int[1] + 79
 
         scaling_factor = 0.521
         
-        scaled_y = round(corrected_y * scaling_factor)          
+        scaled_y = round(corrected_y * scaling_factor)     
         scaled_x = round(corrected_x * scaling_factor)
 
         global x, y, z
@@ -49,6 +76,7 @@ class beat_viz():
         self.fft.run()
                 
         self.time_start = time.time()
+
         self.current_mouse_position = [0,650]
         self.new_mouse_position = [0,0]
         self.random_increment = [0,0]
@@ -70,6 +98,7 @@ class beat_viz():
         self.fft.run()
         self.current_beat = self.fft.binned_fft[0]
 
+    # The function to move mouse
     def move_mouse(self, jump):
         # Remove the previous random movement
         self.current_mouse_position[0] = self.current_mouse_position[0] - self.random_increment[0]
@@ -81,10 +110,16 @@ class beat_viz():
         # Caculate new position
         self.new_mouse_position = [self.current_mouse_position[0] + self.random_increment[0], self.current_mouse_position[1] + self.random_increment[1]]
 
-        # Move the mouse and click (it seems it is better than drag)
-        pyautogui.mouseDown()
-        pyautogui.moveTo(self.new_mouse_position[0], self.new_mouse_position[1])
-        pyautogui.mouseUp()
+        # # Move the mouse and click (it seems it is better than drag)
+        # pyautogui.mouseDown()
+        # pyautogui.moveTo(self.new_mouse_position[0], self.new_mouse_position[1])
+        # pyautogui.mouseUp()
+
+        global virtual_cursor
+        virtual_cursor['x'] = self.new_mouse_position[0]
+        virtual_cursor['y'] = self.new_mouse_position[1]
+        virtual_cursor['is_active'] = True
+        virtual_cursor['mode'] = 'autonomous'
 
         # Update position
         self.current_mouse_position = self.new_mouse_position
@@ -101,7 +136,12 @@ class beat_viz():
         self.new_mouse_position = [self.current_mouse_position[0] + self.random_increment[0], self.current_mouse_position[1] + self.random_increment[1]]
 
         # Drag behavior
-        pyautogui.dragTo(self.new_mouse_position[0], self.new_mouse_position[1], button='left')
+        global virtual_cursor
+        virtual_cursor['x'] = self.new_mouse_position[0]
+        virtual_cursor['y'] = self.new_mouse_position[1]
+        virtual_cursor['is_active'] = True
+        virtual_cursor['mode'] = 'hand_control'
+        #pyautogui.dragTo(self.new_mouse_position[0], self.new_mouse_position[1], button='left')
 
         # Update position
         self.current_mouse_position = self.new_mouse_position
@@ -109,7 +149,10 @@ class beat_viz():
     def drop_splash(self):
         # If there is a drop press 'space'
         if round(self.current_beat - self.previous_beat) > (self.threshold+5):
-            pyautogui.press('space') 
+            virtual_cursor['splash'] = True
+            #pyautogui.press('space') 
+        else:
+            virtual_cursor['splash'] = False
         
         # Calculate the time window for calculate the drop above
         if  (time.time() - self.time_start) > (1./5):
@@ -133,7 +176,10 @@ class beat_viz():
                 self.current_mouse_position[0] -= jump 
             
             # Update the mouse position according to the jump
-            self.move_mouse(jump)
+            # self.move_mouse(jump)
+
+            # Move the single autonomous cursor
+            self.move_virtual_cursor()
         
         # Splash effect for the drop
         # self.drop_splash()
@@ -161,8 +207,10 @@ class beat_viz():
 
     def hand_control_trigger(self):
         if z > 1800:
+            virtual_cursor['mode'] = 'hand_control'
             return True
         else:
+            virtual_cursor['mode'] = 'autonomous'
             return False
 
     def hand_control(self):        
@@ -244,6 +292,8 @@ def parse_args():
                         help='UDP Server IP')
     parser.add_argument('--port', type=int, default=9876, dest='port',
                         help='UDP Server Port')
+    parser.add_argument('--http-port', type=int, default=8005, dest='http_port',
+                        help='HTTP Server Port for virtual cursor')
     parser.add_argument('--visualizer', action='store_true')
 
     return parser.parse_args()
@@ -257,15 +307,25 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = True
 
+    # HTTP Server for virtual cursor data
+    http_server = http.server.HTTPServer(('localhost', args.http_port), VirtualCursorHTTPHandler)
+    http_thread = threading.Thread(target=http_server.serve_forever)
+    http_thread.daemon = True
+
     # Viz object that contains all the different modes
     viz = beat_viz(args.device)
 
     try:
         server_thread.start()
-        print("Server started at {} port {}".format(args.ip, args.port))
+        http_thread.start()
+        print("UDP Server started at {} port {}".format(args.ip, args.port))
+        print("HTTP Server started at http://localhost:{}".format(args.http_port))
+        print("Virtual cursor data: http://localhost:{}/cursor".format(args.http_port))
         viz.run()
 
     except (KeyboardInterrupt, SystemExit):
         server.shutdown()
+        http_server.shutdown()
         server.server_close()
+        http_server.server_close()
         exit()
