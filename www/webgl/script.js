@@ -40,7 +40,7 @@ var changing_splat_radius = 0.25
 
 // Virtual Cursor
 let virtualCursor = null;
-let lastVirtualCursorFetch = 0;
+let virtualPointer = null;
 
 let config = {
     SIM_RESOLUTION: 64,
@@ -1157,6 +1157,7 @@ multipleSplats(parseInt(Math.random() * 20) + 5);
 
 let lastUpdateTime = Date.now();
 let colorUpdateTimer = 0.0;
+setInterval(fetchVirtualCursor, 16);
 update();
 
 // Add this function before update()
@@ -1165,15 +1166,46 @@ function fetchVirtualCursor(){
         .then(response => response.json())
         .then(cursor => {
             virtualCursor = cursor;
-            lastVirtualCursorFetch = Date.now();
+            processVirtualCursorEvent(cursor);
         })
         .catch(err => {
             // Server not responding - silent fail
         });
 }
 
-// Start fetching virtual cursor data
-setInterval(fetchVirtualCursor, 16);
+function processVirtualCursorEvent(cursor) {
+    if (!cursor || !cursor.event) return;
+    
+    const posX = scaleByPixelRatio(cursor.x);
+    const posY = scaleByPixelRatio(cursor.y);
+    
+    switch(cursor.event) {
+        case 'mousedown':
+            // Find or create virtual pointer (use ID -2 for virtual cursor)
+            let downPointer = pointers.find(p => p.id == -2);
+            if (downPointer == null) {
+                downPointer = new pointerPrototype();
+                pointers.push(downPointer);  // ← ADD TO ARRAY
+            }
+            updatePointerDownData(downPointer, -2, posX, posY);
+            break;
+
+        case 'mousemove':
+            let movePointer = pointers.find(p => p.id == -2);
+            if (movePointer && movePointer.down) {
+                updatePointerMoveData(movePointer, posX, posY);
+            }
+            break;
+
+        case 'mouseup':
+            let upPointer = pointers.find(p => p.id == -2);
+            if (upPointer) {
+                updatePointerUpData(upPointer);
+            }
+            break;
+    }
+}
+
 
 function update () {
     const dt = calcDeltaTime();
@@ -1221,12 +1253,6 @@ function updateColors (dt) {
 function applyInputs () {
     if (splatStack.length > 0)
         multipleSplats(splatStack.pop());
-
-    if (virtualCursor && virtualCursor.is_active) {
-        const texcoordX = virtualCursor.x / canvas.width;
-        const texcoordY = 1.0 - virtualCursor.y / canvas.height;
-        splat(texcoordX, texcoordY, 0, 0, color);
-    }
 
     pointers.forEach(p => {
         if (p.moved) {

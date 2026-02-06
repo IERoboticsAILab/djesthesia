@@ -21,22 +21,35 @@ virtual_cursor = {
     'x': 0,
     'y': 650,
     'is_active': True,
-    'mode': 'autonomous',
-    'splash': False
+    'event': None,
+    'mode': 'autonomous'
 }
+# Track if event has been consumed by WebGL
+cursor_lock = threading.Lock()
 
 class VirtualCursorHTTPHandler(http.server.BaseHTTPRequestHandler):
     """HTTP handler to serve virtual cursor position to WebGL"""
     def do_GET(self):
-        if self.path == '/cursor':
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps(virtual_cursor).encode())
-        else:
-            self.send_response(404)
-            self.end_headers()
+        try:
+            if self.path == '/cursor':
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                with cursor_lock:
+                    global virtual_cursor
+                    response = json.dumps(virtual_cursor)
+                    self.wfile.write(response.encode())
+
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        except (BrokenPipeError, ConnectionResetError):
+            # Client disconnected before we could send the response
+            # This is normal behavior, so we silently ignore it
+            pass
     
     def log_message(self, format, *args):
         # Suppress logging
@@ -85,6 +98,11 @@ class beat_viz():
         self.previous_beat = 0
         self.threshold = 20
 
+        # Drag state
+        self.is_dragging = False
+        self.last_position_update = time.time()
+        self.mousedown_sent = False
+
         # A star variables
         self.path_counter = 0
 
@@ -98,8 +116,53 @@ class beat_viz():
         self.fft.run()
         self.current_beat = self.fft.binned_fft[0]
 
+    def update_cursor_position(self, new_x, new_y):
+        """Update cursor position and send mousemove event"""
+        with cursor_lock:
+            global virtual_cursor
+            virtual_cursor['x'] = new_x
+            virtual_cursor['y'] = new_y
+            
+            # Always send mousemove when position changes during drag
+            if self.is_dragging and self.mousedown_sent:
+                virtual_cursor['event'] = 'mousemove'
+
+            print("  └─ Virtual cursor: move mouse")
+            
+            self.last_position_update = time.time()
+
+    def start_drag(self):
+        """Start a drag sequence"""
+        if not self.is_dragging:
+            with cursor_lock:
+                global virtual_cursor
+                virtual_cursor['event'] = 'mousedown'
+            self.is_dragging = True
+            self.mousedown_sent = False
+            print("  └─ Virtual cursor: mousedown")
+
+            #time.sleep(0.032)
+            self.mousedown_sent = True
+
+    def end_drag(self):
+        """End a drag sequence"""
+        if self.is_dragging:
+            with cursor_lock:
+                global virtual_cursor
+                virtual_cursor['event'] = 'mouseup'
+            self.is_dragging = False
+            self.mousedown_sent = False
+            print("  └─ Virtual cursor: mouseup")
+
+            #time.sleep(0.032)
+
+
     # The function to move mouse
     def move_mouse(self, jump):
+
+        if not self.is_dragging:
+            self.start_drag()
+
         # Remove the previous random movement
         self.current_mouse_position[0] = self.current_mouse_position[0] - self.random_increment[0]
         self.current_mouse_position[1] = self.current_mouse_position[1] - self.random_increment[1]
@@ -111,20 +174,25 @@ class beat_viz():
         self.new_mouse_position = [self.current_mouse_position[0] + self.random_increment[0], self.current_mouse_position[1] + self.random_increment[1]]
 
         # # Move the mouse and click (it seems it is better than drag)
+        
         # pyautogui.mouseDown()
         # pyautogui.moveTo(self.new_mouse_position[0], self.new_mouse_position[1])
         # pyautogui.mouseUp()
 
-        global virtual_cursor
-        virtual_cursor['x'] = self.new_mouse_position[0]
-        virtual_cursor['y'] = self.new_mouse_position[1]
-        virtual_cursor['is_active'] = True
-        virtual_cursor['mode'] = 'autonomous'
-
+        self.update_cursor_position(
+            self.new_mouse_position[0], 
+            self.new_mouse_position[1]
+        )
+        self.end_drag()
+    
         # Update position
         self.current_mouse_position = self.new_mouse_position
 
     def move_mouse_hand(self, jump):
+
+        if not self.is_dragging:
+            self.start_drag()
+
         # Remove the previous random movement
         self.current_mouse_position[0] = self.current_mouse_position[0] - self.random_increment[0]
         self.current_mouse_position[1] = self.current_mouse_position[1] - self.random_increment[1]
@@ -135,12 +203,16 @@ class beat_viz():
         # Caculate new position
         self.new_mouse_position = [self.current_mouse_position[0] + self.random_increment[0], self.current_mouse_position[1] + self.random_increment[1]]
 
-        # Drag behavior
-        global virtual_cursor
-        virtual_cursor['x'] = self.new_mouse_position[0]
-        virtual_cursor['y'] = self.new_mouse_position[1]
-        virtual_cursor['is_active'] = True
-        virtual_cursor['mode'] = 'hand_control'
+        # Update mode and position
+        with cursor_lock:
+            global virtual_cursor
+            virtual_cursor['mode'] = 'hand_control'
+        
+        self.update_cursor_position(
+            self.new_mouse_position[0], 
+            self.new_mouse_position[1]
+        )
+        self.end_drag()
         #pyautogui.dragTo(self.new_mouse_position[0], self.new_mouse_position[1], button='left')
 
         # Update position
@@ -150,7 +222,7 @@ class beat_viz():
         # If there is a drop press 'space'
         if round(self.current_beat - self.previous_beat) > (self.threshold+5):
             virtual_cursor['splash'] = True
-            #pyautogui.press('space') 
+            #pyautogui.press('space')
         else:
             virtual_cursor['splash'] = False
         
@@ -202,6 +274,7 @@ class beat_viz():
 
         # Splash effect for the drop
         self.drop_splash()
+        virtual_cursor['splash'] = False
 
     def hand_control_trigger(self):
         if z > 1800:
@@ -257,7 +330,7 @@ class beat_viz():
                 first_time = False
                 path = a.search([self.current_mouse_position[0], self.current_mouse_position[1]], [x,y])
                 path = path[::4]
-                go_to_hand = True        
+                go_to_hand = True      
                 self.path_counter = 0
 
             if go_to_hand:
@@ -299,7 +372,7 @@ def parse_args():
 if __name__ == "__main__":
     # Parsing the arguments from command line
     args = parse_args()
-    
+
     # UDP Server parameters 
     server = ThreadedUDPServer((args.ip, args.port), ThreadedUDPRequestHandler)
     server_thread = threading.Thread(target=server.serve_forever)
