@@ -25,19 +25,21 @@ class ThreadedUDPRequestHandler(socketserver.BaseRequestHandler):
         data_string = list(data.decode()[1:-1].split(','))
         data_int = [int(round(float(i),1)*10) for i in data_string]
 
-        corrected_x = data_int[0] + 225 
-        corrected_y = -data_int[1] + 79
+        corrected_x = data_int[0] + 1450
+        corrected_y = - data_int[1] + 3900
 
-        scaling_factor = 0.521
+        # scaling_factor = 0.521
+        scaling_factor = 0.570
         
         scaled_y = round(corrected_y * scaling_factor)          
         scaled_x = round(corrected_x * scaling_factor)
 
         global x, y, z
-        y = scaled_y + 120
+        
+        y = scaled_y  # prev 120
         x = scaled_x 
         z = data_int[2]
-
+        
         socket.sendto(data.upper(), self.client_address)
 
 class ThreadedUDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):    
@@ -126,6 +128,7 @@ class beat_viz():
                 self.direction_forward = False
 
             jump = round(self.current_beat/3)
+            
 
             if self.direction_forward:
                 self.current_mouse_position[0] += jump
@@ -183,8 +186,8 @@ class beat_viz():
         grid = np.ones((pyautogui.size()[0], pyautogui.size()[1]))
 
         # Forbidden space
-        for row in range(0, 450):
-            for column in range(750, 1150):
+        for row in range(0, 300):
+            for column in range(690, 1120):
                 grid[column][row] = 0
 
         # A star algorithm with the path desired
@@ -193,11 +196,11 @@ class beat_viz():
         astar_thread.daemon = True
         astar_thread.start()
         
-        path = a.search([75,200], [75, 650])
-        path = path + a.search([75, 650], [1400, 650])
-        path = path + a.search([1400, 650], [1400, 200])
-        path = path + a.search([1400, 200], [75, 200])
-        path = path[::3]
+        path = a.search([75,350], [75, 950])
+        path = path + a.search([75, 950], [1750, 950])
+        path = path + a.search([1750, 950], [1750, 350])
+        path = path + a.search([1750, 350], [75, 350])
+        path = path[::8]
 
         # Path that will be used later
         circle_path = path
@@ -211,7 +214,7 @@ class beat_viz():
                 first_time = False
                 path = a.search([self.current_mouse_position[0], self.current_mouse_position[1]], [x,y])
                 path = path[::4]
-                go_to_hand = True        
+                go_to_hand = True
                 self.path_counter = 0
 
             if go_to_hand:

@@ -38,10 +38,11 @@ def get_positions():
     response = requests.get("http://127.0.0.1:8002/position/2")
     umh1_z = int(response.content.decode('UTF-8'))
 
+
 def trigger_eq():
-    if umh1_z > 750 and umh1_z < 850:
-        if umh1_x > 450 and umh1_x < 600:
-            if umh1_y > 160 and umh1_y < 300:
+    if umh1_z > 800 and umh1_z < 900:
+        if umh1_x > -190 and umh1_x < -40:
+            if umh1_y > -1620 and umh1_y < -1450:
                 return True
     return False
 
@@ -82,7 +83,7 @@ while (True):
     if trigger_eq():
         if not spline_complete:
             spline_array_x.append(len(spline_array_x))
-            spline_array_y.append(umh0_y)
+            spline_array_y.append(umh0_y + 1800)
             time.sleep(0.005) 
         
     else:
@@ -96,7 +97,8 @@ while (True):
         fsmooth.set_smoothing_factor(0.5)
         
         for i in range(1,32):
-            device.parameters[i].value = fsmooth(i*3)/500
+            value = fsmooth(i*3)/500
+            device.parameters[i].value = value
     
     if trigger_disconnect_eq():
         reset_eq()

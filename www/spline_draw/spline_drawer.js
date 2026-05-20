@@ -53,6 +53,8 @@ while(true) {
         x_umh0 = parseInt(value[0])
         y_umh0 = parseInt(value[1])
         z_umh0 = parseInt(value[2])
+		// console.log("umh0 raw", x_umh0, y_umh0, z_umh0);
+
     });
 
 	var promise1 = new Promise(function(resolve, reject) {
@@ -77,8 +79,9 @@ while(true) {
 
 	if(trigger_eq())
 	{
+		
 		// click coordinates
-		var x = parseInt(x_umh0 - 300), y = parseInt(y_umh0 - 300);
+		var x = parseInt(x_umh0 + 400), y = parseInt(y_umh0 + 1500);
 
 		// draw a black circle to indicate dot position
 		var point = new THREE.Mesh(
@@ -90,6 +93,7 @@ while(true) {
 
 		// add the point to the curve
 		curve.points.push( new THREE.Vector2(x,y) );
+		// console.log("curve len after", curve.points.length);
 		curve = new THREE.SplineCurve( curve.points );
 		var points = curve.getPoints( 20*curve.points.length );
 
@@ -112,9 +116,9 @@ while(true) {
 }
 
 function trigger_eq(){
-	if (z_umh1 > 750 && z_umh1 < 850)
-		if (x_umh1 > 450 && x_umh1 < 600)
-			if (y_umh1 > 160 && y_umh1 < 300)
+	if (z_umh1 > 800 && z_umh1 < 900)
+		if (x_umh1 > -190  && x_umh1 < -40)
+			if (y_umh1 > -1620 && y_umh1 < -1450)
 				return true;
 	return false;
 }
