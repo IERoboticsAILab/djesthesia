@@ -1,0 +1,13 @@
+numpy
+scipy
+pygame
+python-sounddevice
+requests
+
+#   Install pip-only separately
+#   python -m pip install pyobjc-core pyobjc-framework-quartz
+#   python -m pip install pyautogui --no-deps
+#   python -m pip install pymsgbox pytweening pyscreeze pygetwindow pyrect pyperclip pillow
+#   python -m pip install pylive
+
+
