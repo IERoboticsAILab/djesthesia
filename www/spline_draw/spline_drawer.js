@@ -75,13 +75,15 @@ while(true) {
 		x_umh1 = parseInt(value[0])
 		y_umh1 = parseInt(value[1])
 		z_umh1 = parseInt(value[2])
+		// console.log("umh1 raw", x_umh1, y_umh1, z_umh1);
     });
 
 	if(trigger_eq())
 	{
-		
+		// console.log("window size", -innerWidth/2, innerWidth/2, innerHeight/2, -innerHeight/2);
 		// click coordinates
-		var x = parseInt(x_umh0 + 400), y = parseInt(y_umh0 + 1500);
+		var x = parseInt(- x_umh0 + 1200), y = parseInt(- y_umh0 - 480);
+		console.log("x and y", x, y)
 
 		// draw a black circle to indicate dot position
 		var point = new THREE.Mesh(
@@ -116,9 +118,10 @@ while(true) {
 }
 
 function trigger_eq(){
-	if (z_umh1 > 800 && z_umh1 < 900)
-		if (x_umh1 > -190  && x_umh1 < -40)
-			if (y_umh1 > -1620 && y_umh1 < -1450)
+	if (z_umh1 > 700 && z_umh1 < 900)
+		if (x_umh1 > 850  && x_umh1 < 1050)
+			if (y_umh1 > -450 && y_umh1 < -350)
+				// console.log("The eq is triggered")
 				return true;
 	return false;
 }

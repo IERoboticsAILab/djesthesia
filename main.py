@@ -12,7 +12,10 @@ import numpy as np
 x = 0
 y = 0
 z = 0
+# cor_x = 0
+# cor_y = 0
 
+ 
 color = None
 
 class ThreadedUDPRequestHandler(socketserver.BaseRequestHandler):
@@ -25,20 +28,22 @@ class ThreadedUDPRequestHandler(socketserver.BaseRequestHandler):
         data_string = list(data.decode()[1:-1].split(','))
         data_int = [int(round(float(i),1)*10) for i in data_string]
 
-        corrected_x = data_int[0] + 1450
-        corrected_y = - data_int[1] + 3900
+        corrected_x = -data_int[0] + 2610
+        corrected_y = data_int[1] - 300
 
         # scaling_factor = 0.521
-        scaling_factor = 0.570
+        scaling_factor = 0.37
         
         scaled_y = round(corrected_y * scaling_factor)          
         scaled_x = round(corrected_x * scaling_factor)
 
         global x, y, z
-        
+
         y = scaled_y  # prev 120
         x = scaled_x 
         z = data_int[2]
+        # cor_x = data_int[0]
+        # cor_y = data_int[1]
         
         socket.sendto(data.upper(), self.client_address)
 
@@ -186,8 +191,8 @@ class beat_viz():
         grid = np.ones((pyautogui.size()[0], pyautogui.size()[1]))
 
         # Forbidden space
-        for row in range(0, 300):
-            for column in range(690, 1120):
+        for row in range(0, 400):
+            for column in range(500, 900):
                 grid[column][row] = 0
 
         # A star algorithm with the path desired
@@ -195,12 +200,12 @@ class beat_viz():
         astar_thread = threading.Thread()
         astar_thread.daemon = True
         astar_thread.start()
-        
-        path = a.search([75,350], [75, 950])
-        path = path + a.search([75, 950], [1750, 950])
-        path = path + a.search([1750, 950], [1750, 350])
-        path = path + a.search([1750, 350], [75, 350])
-        path = path[::8]
+
+        path = a.search([50,250], [50, 650])
+        path = path + a.search([50, 650], [1220, 650])
+        path = path + a.search([1220, 650], [1220, 250])
+        path = path + a.search([1220, 250], [50, 250])
+        path = path[::3]
 
         # Path that will be used later
         circle_path = path
@@ -212,11 +217,13 @@ class beat_viz():
         while True:
             if self.hand_control_trigger() and first_time:
                 first_time = False
+                # print(f"current mouse position x:{self.current_mouse_position[0]}, y:{self.current_mouse_position[1]} ")
+                # print(f"x:{x},y:{y}")
+                # print(f"Opti-track position x:{cor_x}, y:{cor_y}")
                 path = a.search([self.current_mouse_position[0], self.current_mouse_position[1]], [x,y])
                 path = path[::4]
                 go_to_hand = True
                 self.path_counter = 0
-
             if go_to_hand:
                 if math.dist([self.current_mouse_position[0], self.current_mouse_position[1]], [x,y]) < 75:
                     hand_control = True
@@ -228,7 +235,7 @@ class beat_viz():
                     go_to_hand = False
                     hand_control = False
                     
-                    path = a.search([x,y], [75, 200])
+                    path = a.search([x,y], [50, 250])
                     path = path + circle_path
                     path = path[::3]
 

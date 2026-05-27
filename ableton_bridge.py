@@ -40,9 +40,9 @@ def get_positions():
 
 
 def trigger_eq():
-    if umh1_z > 800 and umh1_z < 900:
-        if umh1_x > -190 and umh1_x < -40:
-            if umh1_y > -1620 and umh1_y < -1450:
+    if umh1_z > 700 and umh1_z < 900:
+        if umh1_x > 850 and umh1_x < 1050:
+            if umh1_y > -450 and umh1_y < -350:
                 return True
     return False
 
@@ -79,12 +79,13 @@ while (True):
     
     except:
         pass
-
+    
     if trigger_eq():
         if not spline_complete:
             spline_array_x.append(len(spline_array_x))
-            spline_array_y.append(umh0_y + 1800)
-            time.sleep(0.005) 
+            # spline_array_y.append(umh0_y + 1800)
+            spline_array_y.append(-umh0_y)
+            time.sleep(0.05) 
         
     else:
         if spline_array_x and len(spline_array_x) < 93:
@@ -97,7 +98,7 @@ while (True):
         fsmooth.set_smoothing_factor(0.5)
         
         for i in range(1,32):
-            value = fsmooth(i*3)/500
+            value = fsmooth(i*3)/1000
             device.parameters[i].value = value
     
     if trigger_disconnect_eq():
